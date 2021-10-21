@@ -1,0 +1,440 @@
+---
+title: "<font color='orange'>Final Project | Part One</font>"
+author: "EAST 2: Jonathan Gragg, William Johnson, Douglas Wiley"
+output:
+  html_notebook: default
+  html_document:
+    number_sections: true
+    theme: readable
+    highlight: tango
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, cache=FALSE, include=FALSE}
+
+#options(scipen = 1, digits = 2) #set to two decimal 
+```
+
+```{r include=FALSE}
+# missing data
+library(MissMech)   # TestMCARNormality
+
+# classifiers/clustering
+library(psych)       # nfactors
+library(cluster)     # clusplot, pam, fanny
+library(factoextra)  # dist, fviz_cluster
+library(mclust)      # mclustBIC, Mclust, coordProj
+library(NbClust)     # NbClust
+
+# utilities
+library(janitor)     # clean_names
+library(tidyverse)   # everything
+
+# plotting
+library(cowplot)     # 
+#library(knitr)       # include_graphics
+library(ggplot2)     # ggplot2
+library(ggpubr)      # ggarrange
+library(formattable) # formattable
+library(data.table)
+```
+
+```{r include=FALSE}
+# get source file and convert to dataframe
+df_raw <- read.table('SFO_survey_withText.txt', sep='\t', header=T)
+
+# fix column headings
+df_raw <- clean_names(df_raw)
+
+# first look
+head(df_raw)
+
+```
+
+```{r include=FALSE}
+# look at percent missing
+sapply(df_raw, function(x) round(((sum(is.na(x)) + sum(is.null(x)) + sum(is.nan(x)))/length(x)) * 100, 2))
+
+# mcar test not performed as dataset sparsity is possibly by design
+#TestMCARNormality(df)
+```
+
+```{r include=FALSE}
+# create a dataframe of q6 responses
+df_q6 <- df_raw %>% select(respnum, starts_with('q6')) 
+
+# change q6 to 1...5 with 0 as NA
+df_q6[2:15] <- lapply(df_q6[2:15], function(x) ifelse(x==6 | is.null(x) | is.na(x), 0, x))
+
+# update q6 as an ordered factor
+q6_labels <- c("None", "Unacceptable", "Poor", "Neutral", "Good", "Outstanding")
+df_q6[2:15] <- lapply(df_q6[2:15], function(x) ordered(x, levels = 0:5, labels = q6_labels))
+
+levels(df_q6$q6a)
+```
+
+<br>
+
+# <font color='orange'>San Francisco International Airport Satisfaction Survey</font>
+
+## Introduction
+
+The San Francisco International Airport conducts a yearly comprehensive survey [the survey] of airport guests to rate their satisfaction of facilities, services and amenities. The goal of the survey is to compare the results to previous years and look for areas of and discover new opportunities for improvement.  The survey is comprised of sections:
+
+- Flight Information: choice of airline, the destination, reason for traveling.
+- Passenger Experience: airport aesthetics, security and safety.
+- SFO Website - access and overall usefulness
+- Residence - Bay Area, state, country
+- Demographic Information - age, gender, income
+
+The survey version under study was taken from 2015.
+
+### Part A
+
+#### Research Questions
+
+This research centers around developing an in-depth view of who are the satisfied and unsatisfied customers. The approach is to explore the data without any explicit hypothesis, through the application of data science essentials: collecting, cleansing, exploring, and visualizing the data. Specifically, the research will focus on:
+
+- **Who is satisfied or unsatisfied?** This research will identify if a customer satisfaction proxy can be created from the survey questions. 
+- **Who are the customers?** This research will explore the customer's demographic data in the survey.
+- **What about their flight habits?** Using the flight information in the survey, show the ways customers are intersecting with the airport.
+
+In total this research seeks to narrate a story - in a most literal sense tell the customer journey. This insight will be useful in creating opportunities for improvement at the facility as well as developing future surveys.
+
+#### Exploratory Data Analysis
+
+The survey data is cross-sectional, wide format, and attitudinal in nature, implemented using dichotomous (Yes/No), multiple-choice rating questions along with open-ended text. There are 3,234 total observations, with 101 columns (also called features in this document). 
+
+Further inspection shows there are a significant number of features with missing values. Overall, this sparsity is not problematic, but most likely by design as these represent question categories without responses as well as comment fields without any entered text.
+ 
+Of primary significance are the results from Question 6. This survey item asks 'How does SFO rate on each of the following attributes?' on 14 categories identified as a, b, c...n. Responses denote a level of acceptability ranging from 1-Unacceptable to 5-Outstanding, with 0 representing a 'blank', and 6 meaning N/A. These ratings will be useful in deriving a sentiment score for each observation. This table summarizes the items for Question 6.
+
+```{r echo=FALSE, out.width=3, fig.align='center'}
+q6_items <- data.table(
+  Item = c(
+    '6a',
+    '6b',
+    '6c',
+    '6d',
+    '6e',
+    '6f', 
+    '6g',
+    '6h',
+    '6i',
+    '6j',
+    '6k',
+    '6l',
+    '6m',
+    '6n'),
+  Topic = c(
+    'Artwork and exhibitions',
+    'Restaurants',
+    'Retail shops and concessions',
+    'Signs and directions inside SFO',
+    'Escalators/elevators/moving walkways',
+    'Information on screens/monitors',
+    'Information booths (lower level near baggage claim)',
+    'Information booths (upper level – departure area)',
+    'Signs and directions on SFO airport roadways',
+    'Airport parking facilities',
+    'AirTrain',
+    'Long term parking lot shuttle',
+    'Airport rental car center',
+    'SFO Airport as a whole')
+  )
+
+formattable(
+  q6_items, 
+  align=c('r', 'l'),
+  table.attr = 'style="font-size: 11px;width=400px"',
+  list('Item'=formatter('span', style=~style('font.weight'='bold'))))
+```
+
+For example, shown here are two items from Question 6. These graphics summarize the responses for all of the observations for 6a. Artwork & Exhibitions and 6n. SFO Airport (considering the whole airport).
+
+```{r include=FALSE}
+# create a dataframe of q6 responses
+df_q6 <- df_raw %>% select(respnum, starts_with('q6')) 
+
+# change q6 to 1...5 with 0 as NA
+df_q6[2:15] <- lapply(df_q6[2:15], function(x) ifelse(x==6 | is.null(x) | is.na(x), 0, x))
+
+# update q6 as an ordered factor
+q6_labels <- c("None", "Unacceptable", "Poor", "Neutral", "Good", "Outstanding")
+df_q6[2:15] <- lapply(df_q6[2:15], function(x) ordered(x, levels = 0:5, labels = q6_labels))
+
+levels(df_q6$q6a)
+```
+
+```{r include=FALSE}
+# eda bar chart #1
+plot_q6a <- ggplot(
+  data=df_q6 %>% filter(as.integer(q6a) > 1),
+  aes(x=q6a)) +
+  geom_bar(
+    fill=c('gray', 'gray', 'orange', 'orange', 'orange'),
+    alpha=0.5,
+    na.rm=TRUE) +
+    labs(
+      title='Q6a. Artwork & Exhibitions',
+      x='',
+      y='') 
+```
+
+```{r include=FALSE}
+# eda bar chart #2
+plot_q6n <- ggplot(
+   data=df_q6 %>% filter(as.integer(q6n) > 1),
+   aes(x=q6n)) +
+   geom_bar(
+    fill=c('gray', 'gray', 'orange', 'orange', 'orange'),
+    alpha=0.5,
+    na.rm=TRUE) +
+   labs(
+     title='Q6n. SFO Airport Overall',
+     x='',
+     y='') 
+```
+
+```{r echo=FALSE, message=FALSE, out.width=8, fig.align='center'}
+# use cowplot to assemble into a single graphic
+plot_grid_q6a_q6n <- plot_grid(
+  plot_q6a + theme(legend.position='none'), 
+  plot_q6n + theme(legend.position='none'),
+  ncol = 2, 
+  nrow = 1)
+
+# assemble all of the parts
+plot_grid(
+  plot_grid_q6a_q6n,
+  ncol=1,
+  rel_heights=c(1))
+```
+
+#### Analysis Plan
+
+In answering **who is satisfied or unsatisfied**, the analysis will create a proxy variable 'satisfied' by isolating Questions 6a through 6n. For each observation, use the statistical mode (the value that appears most often) for the question:
+
+- A mode corresponding with either Neutral, Good or Outstanding will result in a positive value. 
+- A mode corresponding with Poor or Unacceptable will result in a negative value. 
+
+Using the 'satisfied' proxy variable from the previous research and survey demographic data, **who are the customers** can be better understood by:
+
+- Plotting the ages (survey question 17) and gender (survey question 18)  of the customer and their level of satisfaction.
+- Identifying the customer's country of origin (survey question 16) and their level of satisfaction.
+
+Understanding the **customers flight habits** can be attempted by:
+
+- Using the 'satisfied' proxy variable for the previous research.
+- Viewing the customer's yearly number of flights (survey question 5).
+
+
+#### Results
+ 
+Survey question 6 was utilized to answer **who is satisfied or unsatisfied**. A look at all responses suggest a normal distribution, thankfully skewed towards more satisfied customers.
+
+```{r echo=FALSE, message=FALSE, fig.align='center', out.width='3'}
+# data for chart 3
+df_q6_long <- df_q6 %>% 
+  pivot_longer(cols=all_of(starts_with('q6')), values_to='q6') %>% 
+  filter(as.integer(q6) > 1)
+
+# eda bar chart #3
+ggplot(
+  data=df_q6_long,
+  aes(x=q6)) +
+  geom_bar(
+    alpha=0.5,
+    fill=c('gray', 'gray', 'orange', 'orange', 'orange'),
+    na.rm=TRUE) +
+  labs(
+    title='Question 6a-6n. All Responses',
+    x='',
+    y='') 
+```
+
+Using the satisfaction proxy created in the previous research, **who are the customers** becomes clear. Survey respondents across all age brackets (survey question 17) are satisfied with the SFO airport as show here.
+
+```{r include=FALSE}
+# add a satisfied feature to a new df
+mode <- function(vals){ which.max(tabulate(vals)) }
+
+# get measures of central tendency for each observation
+df_q6_short <- df_q6_long %>%
+  filter(as.integer(q6) > 1) %>% 
+  group_by(respnum) %>%
+  summarise(q6_mean = mean(as.integer(q6)), 
+            q6_mode = mode(as.integer(q6)),
+            q6_median = median(as.integer(q6)))
+
+# add a satisfied indicator
+df_q6_short <- df_q6_short %>% 
+  mutate(satisfied = ifelse(q6_mode >= 4, 'Yes', 'No'))
+
+# add the new q6 features back to the df
+df <- merge(df_raw, df_q6_short, by='respnum')
+```
+
+```{r echo=FALSE, out.width=2}
+# create data for gender plot
+df_gender <- df %>% 
+  filter(!is.na(q18)) %>% 
+  mutate(gender_f=factor(
+      q18,
+      levels=c(1, 2),
+      labels=c('Male', 'Female'))) %>% 
+  select(respnum, gender=q18, gender_f, satisfied)
+
+# plot of satisfied/unsatisfied by gender
+plot_gender <- ggplot(
+   data=df_gender,
+   aes(
+     x=gender_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='SFO Airport: Satisfaction by Gender',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('grey', 'orange')) 
+```
+
+
+```{r echo=FALSE, out.width=4}
+# create data for age plot
+df_age <- df %>% 
+  filter(!is.na(age)) %>% 
+  mutate(age_f=cut(
+      age,
+      breaks=c(0, 8, 15, 21, 30, 40, 50, 60, Inf),
+      labels=c('0', '0-15', '16-21', '22-30', '31-40', '41-50', '51-60', '61+' ),
+      right=FALSE,
+      ordered_result=TRUE)) %>% 
+  select(respnum, age, age_f, satisfied)
+
+# plot of satisfied/unsatisfied by age
+plot_age <- ggplot(
+   data=df_age,
+   aes(
+     x=reorder(age_f, desc(age_f)), 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='SFO Airport: Satisfaction by Age',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('grey', 'orange')) 
+```
+
+```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.width=8}
+# use cowplot to assemble into a single graphic
+plot_grid_gender_age <- plot_grid(
+  plot_gender + theme(legend.position='none'), 
+  plot_age + theme(legend.position='none'),
+  ncol = 2, 
+  nrow = 1)
+
+# extract the legend
+legend_gender_age <- get_legend(
+  plot_gender +
+  guides(color = guide_legend(nrow=1)) +
+  theme(legend.position='bottom'))
+
+# assemble all of the parts
+plot_grid(
+  plot_grid_gender_age,
+  legend_gender_age,
+  ncol=1,
+  rel_heights=c(1, 0.1))
+```
+
+Survey respondents come from many different countries (survey question 16). Of the entire survey population, here are the countries that had greater than 10 surveys completed. The good news continues, regardless of country:
+
+```{r echo=FALSE}
+# create data for country plots
+
+levels=c(
+  1,2,3,6,
+  8,10,12,20,
+  21,24,27,29,
+  30,32,33,35,
+  36,43,44,49,
+  52,53,55,56,
+  59,60,62)
+  
+labels=c(
+  'Argentina', 'Australia', 'Austria', 'Belgium', 
+  'Brazil', 'Canada', 'China', 'France', 
+  'Germany', 'India', 'Ireland', 'Italy',
+  'Japan', 'Korea', 'Mexico', 'Netherlands',
+  'New Zealand', 'Peru', 'Philippines', 'Singapore',
+  'South Korea', 'Spain', 'Switzerland', 'Taiwan',
+  'UAE', 'UK', 'USA')
+  
+df_country_percent <-df %>% 
+  filter(!is.na(country)) %>% 
+  group_by(country) %>% 
+  summarize(
+    surveys = n(),
+    satisfied_percent = as.integer((sum(satisfied=='Yes')/n())*100),
+    unsatisfied_percent = as.integer((sum(satisfied=='No')/n())*100)) %>% 
+  filter(surveys >= 10) %>% 
+  mutate(country_f=factor(
+      country,
+      levels=levels,
+      labels=labels)) %>% 
+  select(Country=country_f, Surveys=surveys, Satisfied=satisfied_percent)
+```
+
+```{r echo=FALSE, out.width=3, fig.align='center'}
+formattable(
+  df_country_percent %>% arrange(desc(Surveys)), 
+  table.attr = 'style="font-size: 11px;"',
+  align=c('l', 'r', 'r'),
+  list('Country'=formatter('span', style=~style('font.weight'='bold')),
+       'Satisfied' = function(x) percent(x/100, digits = 0))
+)
+```
+
+
+
+
+
+#### Discussion
+
+
+#### Apendix A: Code
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
