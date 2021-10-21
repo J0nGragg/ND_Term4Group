@@ -1,1 +1,1 @@
-This is a project for Behvariol Data Science
+This is a project for Behavioral Data Science
