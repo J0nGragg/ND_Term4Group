@@ -2,14 +2,15 @@
 title: "<font color='orange'>Final Project | Part One</font>"
 author: "EAST 2: Jonathan Gragg, William Johnson, Douglas Wiley"
 output:
-  html_notebook: default
   html_document:
     number_sections: true
     theme: readable
     highlight: tango
     df_print: paged
+  html_notebook: default
   pdf_document: default
 ---
+
 
 ```{r setup, cache=FALSE, include=FALSE}
 
@@ -20,25 +21,18 @@ output:
 # missing data
 library(MissMech)   # TestMCARNormality
 
-# classifiers/clustering
-library(psych)       # nfactors
-library(cluster)     # clusplot, pam, fanny
-library(factoextra)  # dist, fviz_cluster
-library(mclust)      # mclustBIC, Mclust, coordProj
-library(NbClust)     # NbClust
-
 # utilities
 library(janitor)     # clean_names
 library(tidyverse)   # everything
 
 # plotting
 library(cowplot)     # 
-#library(knitr)       # include_graphics
+library(knitr)       # include_graphics
 library(ggplot2)     # ggplot2
-library(ggpubr)      # ggarrange
 library(formattable) # formattable
 library(data.table)
 ```
+
 
 ```{r include=FALSE}
 # get source file and convert to dataframe
@@ -76,7 +70,7 @@ levels(df_q6$q6a)
 
 <br>
 
-# <font color='orange'>San Francisco International Airport Satisfaction Survey</font>
+# <font color='orange'>San Francisco International Airport Survey</font>
 
 ## Introduction
 
@@ -110,7 +104,7 @@ Further inspection shows there are a significant number of features with missing
  
 Of primary significance are the results from Question 6. This survey item asks 'How does SFO rate on each of the following attributes?' on 14 categories identified as a, b, c...n. Responses denote a level of acceptability ranging from 1-Unacceptable to 5-Outstanding, with 0 representing a 'blank', and 6 meaning N/A. These ratings will be useful in deriving a sentiment score for each observation. This table summarizes the items for Question 6.
 
-```{r echo=FALSE, out.width=3, fig.align='center'}
+```{r echo=FALSE}
 q6_items <- data.table(
   Item = c(
     '6a',
@@ -141,14 +135,17 @@ q6_items <- data.table(
     'AirTrain',
     'Long term parking lot shuttle',
     'Airport rental car center',
-    'SFO Airport as a whole')
-  )
+    'SFO Airport as a whole'))
 
-formattable(
-  q6_items, 
-  align=c('r', 'l'),
-  table.attr = 'style="font-size: 11px;width=400px"',
-  list('Item'=formatter('span', style=~style('font.weight'='bold'))))
+as.htmlwidget(
+  formattable(
+    q6_items, 
+    align=c('r', 'l'),
+    table.attr = 'class="table table-striped" style="font-size: 11px;"',
+    list('Item'=formatter('span', style=~style('font.weight'='bold')))),
+  width=500)
+  
+
 ```
 
 For example, shown here are two items from Question 6. These graphics summarize the responses for all of the observations for 6a. Artwork & Exhibitions and 6n. SFO Airport (considering the whole airport).
@@ -212,6 +209,7 @@ plot_grid(
   rel_heights=c(1))
 ```
 
+
 #### Analysis Plan
 
 In answering **who is satisfied or unsatisfied**, the analysis will create a proxy variable 'satisfied' by isolating Questions 6a through 6n. For each observation, use the statistical mode (the value that appears most often) for the question:
@@ -224,11 +222,11 @@ Using the 'satisfied' proxy variable from the previous research and survey demog
 - Plotting the ages (survey question 17) and gender (survey question 18)  of the customer and their level of satisfaction.
 - Identifying the customer's country of origin (survey question 16) and their level of satisfaction.
 
-Understanding the **customers flight habits** can be attempted by:
+Better understanding the **customers flight habits** can be achieved by:
 
 - Using the 'satisfied' proxy variable for the previous research.
 - Viewing the customer's yearly number of flights (survey question 5).
-
+- Look at the details of their flight: connection (survey question 1) and destination (survey item destgeo). 
 
 #### Results
  
@@ -254,7 +252,7 @@ ggplot(
     y='') 
 ```
 
-Using the satisfaction proxy created in the previous research, **who are the customers** becomes clear. Survey respondents across all age brackets (survey question 17) are satisfied with the SFO airport as show here.
+Using the satisfaction proxy created in the previous research, **who are the customers** becomes clear. Survey respondents across all genders, age brackets and levels of income are satisfied with the SFO airport as show here.
 
 ```{r include=FALSE}
 # add a satisfied feature to a new df
@@ -270,13 +268,20 @@ df_q6_short <- df_q6_long %>%
 
 # add a satisfied indicator
 df_q6_short <- df_q6_short %>% 
-  mutate(satisfied = ifelse(q6_mode >= 4, 'Yes', 'No'))
+  mutate(satisfied = ifelse(q6_mode >= 4, 1, 0))
+
+df_q6_short <- df_q6_short %>% 
+  mutate(satisfied = ordered(
+    satisfied,
+    levels=c(1, 0),
+    labels=c('Yes', 'No')
+  ))
 
 # add the new q6 features back to the df
 df <- merge(df_raw, df_q6_short, by='respnum')
 ```
 
-```{r echo=FALSE, out.width=2}
+```{r echo=FALSE}
 # create data for gender plot
 df_gender <- df %>% 
   filter(!is.na(q18)) %>% 
@@ -297,58 +302,119 @@ plot_gender <- ggplot(
      alpha = 0.5,
      na.rm=TRUE) +
    labs(
-     title='SFO Airport: Satisfaction by Gender',
+     title='Their Gender',
      x = '',
      y = '',
      fill='Satisfied') +
-   scale_fill_manual(values = c('grey', 'orange')) 
+   scale_fill_manual(values = c('orange', 'grey')) 
 ```
 
-
-```{r echo=FALSE, out.width=4}
+```{r echo=FALSE}
 # create data for age plot
 df_age <- df %>% 
-  filter(!is.na(age)) %>% 
-  mutate(age_f=cut(
-      age,
-      breaks=c(0, 8, 15, 21, 30, 40, 50, 60, Inf),
-      labels=c('0', '0-15', '16-21', '22-30', '31-40', '41-50', '51-60', '61+' ),
-      right=FALSE,
-      ordered_result=TRUE)) %>% 
-  select(respnum, age, age_f, satisfied)
+  filter(!is.na(q17)) %>% 
+  filter(q17 != 8) %>% 
+  filter(q17 != 1) %>% 
+  mutate(age_f=ordered(
+      q17,
+      levels=c(1, 2, 3, 4, 5, 6, 7),
+      labels=c('0-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65+' ))) %>% 
+  select(respnum, age_f, satisfied)
 
 # plot of satisfied/unsatisfied by age
 plot_age <- ggplot(
    data=df_age,
    aes(
-     x=reorder(age_f, desc(age_f)), 
+     x=age_f, 
      fill=satisfied, 
      na.rm=TRUE)) +
    geom_bar(
      alpha = 0.5,
      na.rm=TRUE) +
    labs(
-     title='SFO Airport: Satisfaction by Age',
+     title='Age Brackets',
      x = '',
      y = '',
      fill='Satisfied') +
-   scale_fill_manual(values = c('grey', 'orange')) 
+   scale_fill_manual(values = c('orange', 'grey')) 
 ```
 
-```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, out.width=8}
+```{r echo=FALSE}
+# create data for income plot
+df_income <- df %>% 
+  filter(!is.na(q19)) %>% 
+  filter(q19 != 5) %>% 
+  mutate(income_f=ordered(
+      q19,
+      levels=c(1, 2, 3, 4),
+      labels=c('0-50K', '50K-100K', '100K-150K', '150K+'))) %>% 
+  select(respnum, income_f, satisfied)
+
+# plot of satisfied/unsatisfied by income
+plot_income <- ggplot(
+   data=df_income,
+   aes(
+     x=income_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='Income (USD)',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('orange', 'grey')) 
+```
+
+```{r echo=FALSE}
+# create data for residence plot
+df_rez <- df %>% 
+  filter(!is.na(q15)) %>% 
+  filter(q15 != 4) %>% 
+  mutate(rez_f=ordered(
+      q15,
+      levels=c(1, 2, 3),
+      labels=c('Bay Area', 'Visiting Region', 'Connecting'))) %>% 
+  select(respnum, rez_f, satisfied)
+
+# plot of satisfied/unsatisfied by income
+plot_rez <- ggplot(
+   data=df_rez,
+   aes(
+     x=rez_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='Where They Live',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('orange', 'grey')) 
+```
+
+```{r echo=FALSE}
 # use cowplot to assemble into a single graphic
 plot_grid_gender_age <- plot_grid(
   plot_gender + theme(legend.position='none'), 
-  plot_age + theme(legend.position='none'),
+  plot_age    + theme(legend.position='none'),
+  plot_income + theme(legend.position='none'),
+  plot_rez    + theme(legend.position='none'),
   ncol = 2, 
-  nrow = 1)
+  nrow = 2)
 
 # extract the legend
 legend_gender_age <- get_legend(
   plot_gender +
   guides(color = guide_legend(nrow=1)) +
   theme(legend.position='bottom'))
+```
 
+```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE}
 # assemble all of the parts
 plot_grid(
   plot_grid_gender_age,
@@ -357,7 +423,8 @@ plot_grid(
   rel_heights=c(1, 0.1))
 ```
 
-Survey respondents come from many different countries (survey question 16). Of the entire survey population, here are the countries that had greater than 10 surveys completed. The good news continues, regardless of country:
+
+Survey respondents come from many different countries. Of the entire survey population, here are the countries that had greater than 10 surveys completed. The good news continues, across all countries:
 
 ```{r echo=FALSE}
 # create data for country plots
@@ -396,20 +463,143 @@ df_country_percent <-df %>%
 ```
 
 ```{r echo=FALSE, out.width=3, fig.align='center'}
-formattable(
-  df_country_percent %>% arrange(desc(Surveys)), 
-  table.attr = 'style="font-size: 11px;"',
-  align=c('l', 'r', 'r'),
-  list('Country'=formatter('span', style=~style('font.weight'='bold')),
-       'Satisfied' = function(x) percent(x/100, digits = 0))
-)
+as.htmlwidget(
+  formattable(
+    df_country_percent %>% arrange(desc(Surveys)), 
+    table.attr = 'class="table table-striped" style="font-size: 11px;"',
+    align=c('l', 'r', 'r'),
+    list('Country'=formatter('span', style=~style('font.weight'='bold')),
+         'Satisfied' = function(x) percent(x/100, digits = 0))),
+  width=500)
+```
+
+In viewing **customer flight habits**, for a large majority of survey respondents this was their only flight of the year at the time the survey was recorded. And concurring with the 'Where They Live' chart above, SFO is their final destination - San Francisco is either home or their place to visit.
+
+```{r include=FALSE}
+# create data for dest plot
+df_dest <- df %>% 
+  filter(!is.na(dest)) %>% 
+  mutate(dest_f=ordered(
+      dest,
+      levels=c(1, 2, 3),
+      labels=c('Within CA', 'Out of State', 'Out of Country'))) %>% 
+  select(respnum, dest_f, satisfied)
+
+# plot of satisfied/unsatisfied by destination
+plot_dest <- ggplot(
+   data=df_dest,
+   aes(
+     x=dest_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='Flight Destination',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('orange', 'grey')) 
+```
+
+```{r include=FALSE}
+# create data for connecting plot
+df_conn <- df %>% 
+  filter(!is.na(q1)) %>% 
+  filter(q1!=0) %>% 
+  mutate(conn_f=ordered(
+      q1,
+      levels=c(1, 2),
+      labels=c('Yes', 'No'))) %>% 
+  select(respnum, conn_f, satisfied)
+
+# plot of satisfied/unsatisfied by connection
+plot_conn <- ggplot(
+   data=df_conn,
+   aes(
+     x=conn_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='Connecting Flight?',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('orange', 'grey')) 
+```
+
+```{r include=FALSE}
+# create data for number of flights plot
+df_flights <- df %>% 
+  filter(!is.na(q5)) %>% 
+  filter(q5 != 0) %>% 
+  mutate(flights_f=ordered(
+      q5,
+      levels=c(1, 2, 3, 4, 5, 6),
+      labels=c('1', '2', '3-6', '7-12', '13-24', '25+'))) %>% 
+  select(respnum, flights_f, satisfied)
+
+# plot of satisfied/unsatisfied by connection
+plot_flights <- ggplot(
+   data=df_flights,
+   aes(
+     x=flights_f, 
+     fill=satisfied, 
+     na.rm=TRUE)) +
+   geom_bar(
+     alpha = 0.5,
+     na.rm=TRUE) +
+   labs(
+     title='How Many Flights This Year',
+     x = '',
+     y = '',
+     fill='Satisfied') +
+   scale_fill_manual(values = c('orange', 'grey')) 
+```
+
+```{r include=FALSE}
+# use cowplot to assemble into a single graphic
+plot_grid_conn_dest <- plot_grid(
+  plot_flights + theme(legend.position='none'), 
+  plot_conn + theme(legend.position='none'), 
+#  plot_dest + theme(legend.position='none'),
+  ncol = 2, 
+  nrow = 1)
+
+# extract the legend
+legend_gender_conn <- get_legend(
+  plot_conn +
+  guides(color = guide_legend(nrow=1)) +
+  theme(legend.position='bottom'))
+```
+
+```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE}
+# assemble all of the parts
+plot_grid(
+  plot_grid_conn_dest,
+  legend_gender_conn,
+  ncol=1,
+  rel_heights=c(1, 0.1))
 ```
 
 
-
-
-
 #### Discussion
+
+The story that is told here is that survey respondents are greatly satisfied with SFO Airport operations. This result is across all genders, ages and income levels. Regardless if the Bay Area is their home or their vacation spot, respondents are giving the airport the highest marks. 
+
+In terms of extracting actionable information from this story, there are some issues. First, the research based the satisfied proxy variable on a single set of questions. Though the questions covered a wide and important topics, it didn't factor in other aspects of airport operations such as security. There are other opportunities to derive a satisfaction score for the survey responses:
+
+- It would make interesting research to base the satisfaction score on sentiment analysis done only on the textual comments, and compare those results with the proxy variable created here.
+- Given the imbalances in this data, a critical review of the survey itself may be required. It may need to be restructured in order to gain more actionable information for airport leadership.
+
+
+
+
+
 
 
 #### Apendix A: Code
