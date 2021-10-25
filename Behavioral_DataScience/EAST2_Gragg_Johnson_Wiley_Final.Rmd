@@ -1,14 +1,15 @@
 ---
 title: "<font color='orange'>Final Project | Part One</font>"
-author: "EAST 2: Jonathan Gragg, William Johnson, Douglas Wiley"
+author: 'EAST 2: Jonathan Gragg, William Johnson, Douglas Wiley'
 output:
   html_document:
-    number_sections: true
+    number_sections: yes
     theme: readable
     highlight: tango
     df_print: paged
   html_notebook: default
   pdf_document: default
+  word_document: default
 ---
 
 
@@ -591,15 +592,9 @@ plot_grid(
 
 The story that is told here is that survey respondents are greatly satisfied with SFO Airport operations. This result is across all genders, ages and income levels. Regardless if the Bay Area is their home or their vacation spot, respondents are giving the airport the highest marks. 
 
-In terms of extracting actionable information from this story, there are some issues. First, the research based the satisfied proxy variable on a single set of questions. Though the questions covered a wide and important topics, it didn't factor in other aspects of airport operations such as security. There are other opportunities to derive a satisfaction score for the survey responses:
+For airport leadership, these results can only be viewed as a complete success, but there are problems. The results are heavily positive which ironically hinders the ability to make data-informed decisions. The skewed results may be related to the research itself which was based on a narrowly-defined proxy variable. Though the proxy basis covered a wide and important topics, it didn't factor in other aspects of airport operations. A more sophisticated approach may be to design a composite score that uses the satisfied proxy concept, but include other areas such as security, and sentiment derived from analysis on the textual comments.
 
-- It would make interesting research to base the satisfaction score on sentiment analysis done only on the textual comments, and compare those results with the proxy variable created here.
-- Given the imbalances in this data, a critical review of the survey itself may be required. It may need to be restructured in order to gain more actionable information for airport leadership.
-
-
-
-
-
+Finally, given the imbalances in the results a critical review of the survey itself is required. Does the survey focus too much on range of coverage to the exclusion of specific areas of focus? It may need to be restructured in order to gain more balanced results. Given technological advances in social listening and artificial intelligence, is a survey still the best methodology for understanding the SFO customer? Leveraging these and other innovations will help provide a higher quality of actionable insights for airport leadership.
 
 
 #### Apendix A: Code
