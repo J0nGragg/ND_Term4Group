@@ -1,0 +1,99 @@
+---
+title: "<font color='orange'>Final Project | Part Two</font>"
+author: 'EAST 2: Jonathan Gragg, William Johnson, Douglas Wiley'
+output:
+  html_document:
+    number_sections: yes
+    theme: readable
+    highlight: tango
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+
+```{r setup, cache=FALSE, include=FALSE}
+#options(scipen = 1, digits = 2) #set to two decimal 
+```
+
+```{r include=FALSE}
+# missing data
+#library(MissMech)   # TestMCARNormality
+# utilities
+library(janitor)     # clean_names
+library(tidyverse)   # everything
+# plotting
+library(cowplot)     # 
+library(knitr)       # include_graphics
+library(ggplot2)     # ggplot2
+library(formattable) # formattable
+library(data.table)
+```
+
+
+```{r}
+# get source file and convert to dataframe
+df_raw <- read.table('SFO_survey_withText.txt', sep='\t', header=T)
+# fix column headings
+df_raw <- clean_names(df_raw)
+# first look
+head(df_raw)
+```
+
+```{r}
+a1 <- df_raw %>% mutate(sex = as.factor(q18), income = as.factor(q19), rating = q6n) %>% select(age, weight,country, sex, income, rating) %>% drop_na()
+```
+
+```{r}
+pairs.panels(a1, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+```
+# Factor Analysis
+
+```{r}
+qdf <- df_raw %>% select(starts_with("q"),
+                         -q2_3,-q2_4,-q2_5,-q2_6,
+                         -q3_3,-q3_4,-q3_5,-q3_6,
+                         -q5avg, 
+                         -q7_text_all,
+                         -starts_with("q7a"),
+                         -q7com1,-q7com2,-q7com3,
+                         -q8com1,-q8com2,-q8com3,
+                         -starts_with("q9a"),
+                         -starts_with("q11"),
+                         -q13_com, -starts_with("q13com"),
+                         -starts_with("q14a")) %>%
+        drop_na()
+glimpse(qdf)
+```
+
+```{r}
+#Is a FA analysis appropriate?
+
+#if the p value is small then FA analysis is appropriate
+cortest.bartlett(qdf)
+
+#if overall MSA is over a certain threshold then yes
+KMO(qdf)
+```
+
+```{r,warning=FALSE}
+#Number of factors?
+fa.parallel(qdf)
+```
+
+```{r}
+#orthogonal rotate
+fa2 <- fa(qdf, nfactors = 3, rotate = "varimax", covar = FALSE)
+print(fa2$loadings, cutoff = 0.001, digits = 3)
+```
+
+```{r}
+fa.diagram(fa2)
+```
+
