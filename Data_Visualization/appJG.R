@@ -161,20 +161,20 @@ server <- function(input, output, session) {
   
   output$timechart <- renderPlotly({
     plot_ly(
-      calls_time(), 
-      x = call_date, 
-      y = total,
-      type='bar', 
+      calls_detail(), 
+      x = ~call_date,
+      type='histogram',
+      color = ~department,
       source='timechart',
-      insidetextfont = list(color = '#FFFFFF'),
-      insidetextorientation='radial',
       hoverinfo = 'text',
       marker = list(
         colors = colors,
         line = list(color = '#FFFFFF', width = 1)),
       showlegend=TRUE) %>% 
       config(displayModeBar=FALSE) %>%
-      layout(yaxis = list(title = 'Total'), barmode = 'stack')
+      layout(yaxis = list(title = 'Total'),
+             xaxis = list(title = 'Call Date'), 
+             barmode = 'stack')
   })
   
   output$table <- DT::renderDataTable(DT::datatable({
@@ -230,15 +230,15 @@ server <- function(input, output, session) {
   output$timetitle <- renderUI({
     
     if (is.null(drills$department) && is.null(drills$called_about)) {
-      return <- paste('ALL CALLS')
+      return <- paste('TIME SERIES')
     } else if (!is.null(drills$department) && is.null(drills$called_about)) {
       return <- tags$span(
-        actionLink('lnkHome', 'ALL CALLS'),
+        actionLink('lnkHome', 'TIME SERIES'),
         HTML('|'),
         drills$department)
     } else if (!is.null(drills$department) && !is.null(drills$called_about)) {
       tags$span(
-        actionLink('lnkHome', 'ALL CALLS'),
+        actionLink('lnkHome', 'TIME SERIES'),
         HTML('|'),
         actionLink('lnkDepartments', drills$department),
         HTML('|'),
