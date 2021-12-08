@@ -28,6 +28,13 @@ calls <- calls %>% select(id, department, called_about, duration_seconds, call_d
 calls$call_date <- as.Date(calls$call_date)
 calls <- calls %>% filter(!is.na(duration_seconds))
 
+# get weather data
+weather <- read_csv(url("https://raw.githubusercontent.com/J0nGragg/ND_Term4Group/main/Data_Visualization/2814803.csv"))
+weather <- weather %>% select(-STATION,-NAME)
+weather <- clean_names(weather)
+weather <- weather %>% rename(call_date = date)
+
+calls <- calls %>% inner_join(weather, by='call_date')
 
 ui <- dashboardPage(
   
@@ -162,10 +169,15 @@ server <- function(input, output, session) {
         line = list(color = '#FFFFFF', width = 1)),
       showlegend=FALSE) %>% 
       config(displayModeBar=FALSE) %>%
+      add_trace(data = calls_detail() %>% group_by(call_date) %>% summarise(temp = mean(tavg)), 
+                x = ~call_date, y = ~temp, name = "temp", yaxis = "y2", mode = "lines+markers", type = "scatter") %>%
       layout(yaxis = list(title = 'Number of Calls'),
+             yaxis2 = list(side = 'right',
+                           title = 'Avg Temperature'),
              xaxis = list(title = 'Call Date'), 
              barmode = 'stack',
              mode = 'hide')
+      
   })
   
   output$table <- DT::renderDataTable(DT::datatable({
