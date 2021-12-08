@@ -130,6 +130,13 @@ server <- function(input, output, session) {
       filter(n > 100)
   })
   
+  calls_temp <- reactive({
+    
+    # count and arrange descending
+    calls_detail() %>% 
+      group_by(call_date) %>% summarise(temp = mean(tavg))
+  })
+  
   
   # bar chart of calls by 'current level of category'
   output$piechart <- renderPlotly({
@@ -164,16 +171,14 @@ server <- function(input, output, session) {
       #color = ~department,
       source='timechart',
       hoverinfo = 'text',
-      marker = list(
-        colors = colors,
-        line = list(color = '#FFFFFF', width = 1)),
-      showlegend=FALSE) %>% 
-      config(displayModeBar=FALSE) %>%
-      add_trace(data = calls_detail() %>% group_by(call_date) %>% summarise(temp = mean(tavg)), 
-                x = ~call_date, y = ~temp, name = "temp", yaxis = "y2", mode = "lines+markers", type = "scatter") %>%
+      name = 'Calls') %>% 
+      #config(displayModeBar=FALSE) %>%
+      add_trace(data = calls_temp() ,
+        x = ~call_date, y = ~temp, name = "Temperature", yaxis = "y2", mode = "lines+markers", type = "scatter") %>%
       layout(yaxis = list(title = 'Number of Calls'),
-             yaxis2 = list(side = 'right',
-                           title = 'Avg Temperature'),
+             yaxis2 = list(overlaying = 'y',
+                           side = 'right',
+                           title = 'Avg Temperature (F)'),
              xaxis = list(title = 'Call Date'), 
              barmode = 'stack',
              mode = 'hide')
