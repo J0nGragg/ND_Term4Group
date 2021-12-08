@@ -123,16 +123,6 @@ server <- function(input, output, session) {
       filter(n > 100)
   })
   
-  # add a count variable, used by the timechart
-  calls_time <- reactive({
-    
-    # count and arrange descending
-    calls_detail() %>% 
-      group_by(call_date, department) %>% 
-      summarise(total = n())
-  })
-  
-  
   
   # bar chart of calls by 'current level of category'
   output$piechart <- renderPlotly({
@@ -164,17 +154,18 @@ server <- function(input, output, session) {
       calls_detail(), 
       x = ~call_date,
       type='histogram',
-      color = ~department,
+      #color = ~department,
       source='timechart',
       hoverinfo = 'text',
       marker = list(
         colors = colors,
         line = list(color = '#FFFFFF', width = 1)),
-      showlegend=TRUE) %>% 
+      showlegend=FALSE) %>% 
       config(displayModeBar=FALSE) %>%
-      layout(yaxis = list(title = 'Total'),
+      layout(yaxis = list(title = 'Number of Calls'),
              xaxis = list(title = 'Call Date'), 
-             barmode = 'stack')
+             barmode = 'stack',
+             mode = 'hide')
   })
   
   output$table <- DT::renderDataTable(DT::datatable({
