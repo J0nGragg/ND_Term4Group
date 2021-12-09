@@ -21,12 +21,20 @@ library(readr)
 library(janitor)
 
 # get 311 calls dataset
-calls <- read_csv("Data/311_Phone_Call_Log_Mod.csv")
+calls <- read_csv(url("https://raw.githubusercontent.com/DataSciencend/--Data-Viz-2021-Fall/master/Week01/311_Phone_Call_Log_Mod.csv?token=APZQY2I5JIHHHB2YDTQTR4TBWFBRG"))
 calls <- clean_names(calls)
 calls <- calls %>% rename(id=fid) 
-calls <- calls %>% select(id, department, called_about, duration_seconds)
+calls <- calls %>% select(id, department, called_about, duration_seconds, call_date)
+calls$call_date <- as.Date(calls$call_date)
 calls <- calls %>% filter(!is.na(duration_seconds))
 
+# get weather data
+weather <- read_csv(url("https://raw.githubusercontent.com/J0nGragg/ND_Term4Group/main/Data_Visualization/2814803.csv"))
+weather <- weather %>% select(-STATION,-NAME)
+weather <- clean_names(weather)
+weather <- weather %>% rename(call_date = date)
+
+calls <- calls %>% inner_join(weather, by='call_date')
 
 ui <- dashboardPage(
   
@@ -37,7 +45,7 @@ ui <- dashboardPage(
   
   body <- dashboardBody(
     fluidRow(
-      column(width=8, 
+      column(width=6, 
              box(width=NULL, 
                  height=NULL,
                  solidHeader=FALSE, 
@@ -49,30 +57,16 @@ ui <- dashboardPage(
                  DT::dataTableOutput("table")
              )
       ),
-      column(width=4,
-             box(width=NULL, title = 'Calls Summary Mean:',
-                 status='black', textOutput('sumstatsmean')
+      column(width=6,
+             box(width=NULL, 
+                 height=NULL,
+                 solidHeader=FALSE, 
+                 status='primary',
+                 title=uiOutput('timetitle'),
+                 plotlyOutput("timechart")
              ),
-             box(width=NULL, title = 'Calls Summary Median:',
-                 status='black', textOutput('sumstatsmedian')
-             ),
-             box(width=NULL, title = 'Calls Summary Standard Deviation:',
-                 status='black', textOutput('sumstatssd')
-             )
-             # descriptionBlock(
-             #   number = "sumstatsmean", 
-             #   numberColor = "red", 
-             #   numberIcon = icon("caret-down"),
-             #   header = "1200", 
-             #   text = "GOAL COMPLETION", 
-             #   rightBorder = FALSE,
-             #   marginBottom = FALSE
-             # )
-             
-             #selectInput("stat", "Metric:",
-                         #c("Mean" = 'sumstatsmean',
-                          # "Median" = "sumstatsmedian",
-                          # "Standard Deviation" = "sumstatssd"))
+             box(width=NULL, title = 'Calls Summary Statistics (Seconds):',
+                 status='primary', htmlOutput('sumstats'))
       )
     )
   )
@@ -100,9 +94,9 @@ server <- function(input, output, session) {
       summarystats$callssd <- round(sd(calls$duration_seconds),2)
       return(calls %>%  mutate(value=department))
     }
-     
     
-      # just the called_about's for the specific department
+    
+    # just the called_about's for the specific department
     calls <- filter(calls, department %in% drills$department)
     if (!length(drills$called_about)) {
       summarystats$callsmean <- round(mean(calls$duration_seconds), 2)
@@ -111,7 +105,7 @@ server <- function(input, output, session) {
       return(calls %>%  mutate(value=called_about))
     }
     
-
+    
     summarystats$callsmean <- round(mean(calls$duration_seconds), 2)
     summarystats$callsmedian <- round(median(calls$duration_seconds), 2)
     summarystats$callssd <- round(sd(calls$duration_seconds),2)
@@ -129,6 +123,12 @@ server <- function(input, output, session) {
       filter(n > 100)
   })
   
+  calls_temp <- reactive({
+    
+    # count and arrange descending
+    calls_detail() %>% 
+      group_by(call_date) %>% summarise(temp = mean(tavg))
+  })
   
   
   # bar chart of calls by 'current level of category'
@@ -153,6 +153,28 @@ server <- function(input, output, session) {
       showlegend=TRUE) %>% 
       config(displayModeBar=FALSE) %>% 
       layout(mode = 'hide')
+    
+  })
+  
+  output$timechart <- renderPlotly({
+    plot_ly(
+      calls_detail(), 
+      x = ~call_date,
+      type='histogram',
+      #color = ~department,
+      source='timechart',
+      hoverinfo = 'text',
+      name = 'Calls') %>% 
+      #config(displayModeBar=FALSE) %>%
+      add_trace(data = calls_temp() ,
+                x = ~call_date, y = ~temp, name = "Temperature", yaxis = "y2", mode = "lines+markers", type = "scatter") %>%
+      layout(yaxis = list(title = 'Number of Calls'),
+             yaxis2 = list(overlaying = 'y',
+                           side = 'right',
+                           title = 'Avg Temperature (F)'),
+             xaxis = list(title = 'Call Date'), 
+             barmode = 'stack',
+             mode = 'hide')
     
   })
   
@@ -206,15 +228,30 @@ server <- function(input, output, session) {
     }
   })
   
-  output$sumstatsmean <- renderText({
-    return <- summarystats$callsmean
+  output$timetitle <- renderUI({
+    
+    if (is.null(drills$department) && is.null(drills$called_about)) {
+      return <- paste('TIME SERIES')
+    } else if (!is.null(drills$department) && is.null(drills$called_about)) {
+      return <- tags$span(
+        actionLink('lnkHome', 'TIME SERIES'),
+        HTML('|'),
+        drills$department)
+    } else if (!is.null(drills$department) && !is.null(drills$called_about)) {
+      tags$span(
+        actionLink('lnkHome', 'TIME SERIES'),
+        HTML('|'),
+        actionLink('lnkDepartments', drills$department),
+        HTML('|'),
+        drills$called_about)
+    }
   })
-  output$sumstatsmedian <- renderText({
-    return <- summarystats$callsmedian
-  })
-  output$sumstatssd <- renderText({
-    return <- summarystats$callssd
-  })
+  
+  output$sumstats <- renderUI({
+    str1 <- paste("Average Length:", summarystats$callsmean)
+    str2 <- paste("Median Length:", summarystats$callsmedian)
+    str3 <- paste("Standard Deviation:", summarystats$callssd)
+    HTML(paste(str1, str2, str3, sep = '<br/>'))})
   
   # event handlers
   observeEvent(
