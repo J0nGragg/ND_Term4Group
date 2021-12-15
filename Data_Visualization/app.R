@@ -58,21 +58,29 @@ ui <- dashboardPage(
                    ),
                    box(width=NULL,
                        status='primary',
-                       DT::dataTableOutput("table")
+                       DT::dataTableOutput("detailtable")
                    )
             ),
-            column(width=6,
-                   box(width=NULL, 
-                       height=NULL,
-                       solidHeader=FALSE, 
-                       status='primary',
-                       title=uiOutput('timetitle'),
-                       plotlyOutput("timechart")
-                   ),
-                   box(width=NULL, 
-                       height=NULL,
-                       status='primary', 
-                       htmlOutput('callstats'))
+            column(
+                width=6,
+                box(width=NULL, 
+                   height=NULL,
+                   solidHeader=FALSE, 
+                   status='primary',
+                   title=uiOutput('timetitle'),
+                   plotlyOutput("timechart")
+                ),
+                box(width=NULL, 
+                   height=NULL,
+                   status='primary', 
+                   htmlOutput('callstats')
+                ),
+                box(width=NULL, 
+                   height=NULL,
+                   status='warning',
+                   title='311 Top Ten by Call Volume',
+                   tableOutput('toptentable')
+                )
             )
         )
     )
@@ -182,18 +190,19 @@ server <- function(input, output, session) {
     })
     
     # creates the call detail data table
-    output$table <- DT::renderDataTable(
+    output$detailtable <- DT::renderDataTable(
         
         DT::datatable({
             call_detail() %>% 
-                mutate(Duration = format_seconds(duration_seconds)) %>% 
+                mutate(Duration = format_seconds(duration_seconds)) %>%
                 mutate(Id = paste0("<a href='' target='_blank'>", id, "</a>")) %>% 
-                select(Id, department, called_about, Duration) %>% 
+                select(Id, call_date, department, called_about, Duration) %>% 
+                rename(Date=call_date) %>% 
                 rename(Department=department) %>% 
                 rename(Topic=called_about)
         }, 
         escape = FALSE,
-        option=list(columnDefs=list(list(targets=4, class="dt-right")))
+        option=list(columnDefs=list(list(targets=5, class="dt-right")))
         )
     )
     
@@ -251,7 +260,7 @@ server <- function(input, output, session) {
             tags$div(
                 tags$span(
                     format_seconds(mean(call_detail()$duration_seconds)), 
-                    style='font-size: 80px;'),
+                    style='font-size: 72px;'),
                 tags$span(HTML('mm:ss')),
                 style='text-align:center;'
             ),
@@ -263,6 +272,21 @@ server <- function(input, output, session) {
             )
         )
     })
+    
+    # creates the top ten table
+    output$toptentable <- renderTable(
+        
+        calls %>% 
+            mutate(`Department/Topic` = paste(department, called_about, sep=': ')) %>% 
+            group_by(`Department/Topic`) %>% 
+            summarise(
+                Calls = n(), 
+                Hours = as.integer(sum(duration_seconds) / 360)) %>% 
+            arrange(desc(Calls)) %>% 
+            mutate(Calls = format(Calls, big.mark = ",", scientific = FALSE) ) %>% 
+            mutate(Hours = format(Hours, big.mark = ",", scientific = FALSE) ) %>% 
+            slice(1:10)
+    )
     
     # event handlers
     observeEvent(event_data("plotly_click", source = "piechart"), {
