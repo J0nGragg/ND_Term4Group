@@ -78,7 +78,7 @@ ui <- dashboardPage(
                 box(width=NULL, 
                    height=NULL,
                    status='warning',
-                   title='311 Top Ten by Call Volume',
+                   title=uiOutput('toptentitle'),
                    tableOutput('toptentable')
                 )
             )
@@ -214,14 +214,14 @@ server <- function(input, output, session) {
         } else if (!is.null(drills$department) && is.null(drills$called_about)) {
             return <- tags$span(
                 actionLink('lnkHome', 'ALL CALLS'),
-                HTML('|'),
+                HTML('\U203A'),
                 drills$department)
         } else if (!is.null(drills$department) && !is.null(drills$called_about)) {
             tags$span(
                 actionLink('lnkHome', 'ALL CALLS'),
-                HTML('|'),
+                HTML('\U203A'),
                 actionLink('lnkDepartments', drills$department),
-                HTML('|'),
+                HTML('\U203A'),
                 drills$called_about)
         }
     })
@@ -230,11 +230,11 @@ server <- function(input, output, session) {
     output$timetitle <- renderUI({
         
         if (is.null(drills$department) && is.null(drills$called_about)) {
-            return <- paste('Monthly call volume for all 311')
+            return <- paste('Monthly Call Volume for All 311')
         } else if (!is.null(drills$department) && is.null(drills$called_about)) {
-            return <- paste('Monthly call volume for ', drills$department)
+            return <- paste('Monthly Call Volume for ', drills$department)
         } else if (!is.null(drills$department) && !is.null(drills$called_about)) {
-            paste('Monthly call volume for ', drills$called_about)
+            paste('Monthly Call Volume for ', drills$called_about)
         }
     })
     
@@ -242,11 +242,11 @@ server <- function(input, output, session) {
     output$callstats <- renderUI({
         
         # what has been clicked on
-        pie_context <- 'all 311'
+        pie_context <- 'All 311'
         
         # format text
         if (is.null(drills$department) && is.null(drills$called_about)) {
-            pie_context <- 'all 311'
+            pie_context <- 'All 311'
         } else if (!is.null(drills$department) && is.null(drills$called_about)) {
             pie_context <- drills$department
         } else if (!is.null(drills$department) && !is.null(drills$called_about)) {
@@ -268,7 +268,7 @@ server <- function(input, output, session) {
                 HTML(paste('AHT for all 311 is', format_seconds(mean(calls$duration_seconds)))),
                 style=paste(
                     'font-size: 12px; text-align: left; color: #ff8000; font-weight: bold; visibility:', 
-                    ifelse(pie_context=='all 311', 'hidden;', 'visible;'))
+                    ifelse(pie_context=='All 311', 'hidden;', 'visible;'))
             )
         )
     })
@@ -287,6 +287,11 @@ server <- function(input, output, session) {
             mutate(Hours = format(Hours, big.mark = ",", scientific = FALSE) ) %>% 
             slice(1:10)
     )
+    
+    # creates the top ten title
+    output$toptentitle <- renderUI({
+        return <- '311 Top 10 by Call Volume'
+    })
     
     # event handlers
     observeEvent(event_data("plotly_click", source = "piechart"), {
